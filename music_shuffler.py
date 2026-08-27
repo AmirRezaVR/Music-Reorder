@@ -85,7 +85,6 @@ TEXT = {
 def get_artist(file_path, unknown_artist):
     """
     Read the artist name from the music file metadata.
-
     If no artist information is available,
     return the selected language's "Unknown Artist" value.
     """
@@ -109,7 +108,6 @@ def get_artist(file_path, unknown_artist):
 def remove_existing_number(filename):
     """
     Remove an existing number from the beginning of a filename.
-
     Examples:
         '001 - Song.mp3' -> 'Song.mp3'
         '12_Song.mp3'    -> 'Song.mp3'
@@ -121,7 +119,6 @@ def remove_existing_number(filename):
 def find_music_files(folder_path):
     """
     Return all supported music files inside the selected folder.
-
     Subfolders are ignored.
     """
 
