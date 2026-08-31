@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import heapq
+import random
 
 from collections import defaultdict
 import tkinter as tk
@@ -105,15 +106,34 @@ def get_artist(file_path, unknown_artist):
     return unknown_artist
 
 
-def remove_existing_number(filename):
+def remove_existing_numbers(filename):
     """
-    Remove an existing number from the beginning of a filename.
+    Remove all existing numbering prefixes from the beginning
+    of a filename.
     Examples:
         '001 - Song.mp3' -> 'Song.mp3'
-        '12_Song.mp3'    -> 'Song.mp3'
+        '001 - 002 - Song.mp3' -> 'Song.mp3'
+        '001-001-Song.mp3' -> 'Song.mp3'
+        '001_002_015_Song.mp3' -> 'Song.mp3'
     """
 
-    return re.sub(r"^\s*\d+\s*[-_. ]+\s*", "", filename)
+    name, extension = os.path.splitext(filename)
+
+    while True:
+
+        cleaned_name = re.sub(
+            r"^\s*\d+\s*[-_.]+\s*",
+            "",
+            name,
+            count=1,
+        )
+
+        if cleaned_name == name:
+            break
+
+        name = cleaned_name
+
+    return f"{name.strip()}{extension}"
 
 
 def find_music_files(folder_path):
@@ -141,66 +161,78 @@ def find_music_files(folder_path):
 
 def create_shuffled_order(files_by_artist):
     """
-    Create an order where songs from the same artist
-    are kept apart as much as possible.
+    Create a new order for all songs from scratch.
+    Songs from the same artist are kept apart whenever possible.
+    The order of songs inside each artist group is randomized.
     """
 
     artist_queue = []
 
     for artist, songs in files_by_artist.items():
 
-        songs = sorted(songs)
+        shuffled_songs = songs.copy()
 
-        heapq.heappush(artist_queue, (-len(songs), artist, songs))
+        random.shuffle(shuffled_songs)
 
-    result = []
+        heapq.heappush(
+            artist_queue,
+            (
+                -len(shuffled_songs),
+                random.random(),
+                artist,
+                shuffled_songs,
+            ),
+        )
 
-    previous_artist = None
-    previous_songs = None
-    previous_count = 0
+    ordered_songs = []
 
-    while artist_queue or previous_songs:
+    previous_artist_data = None
+
+    while artist_queue or previous_artist_data:
 
         if not artist_queue:
 
-            count = previous_count
-            artist = previous_artist
-            songs = previous_songs
+            count, random_value, artist, songs = previous_artist_data
 
-            previous_artist = None
-            previous_songs = None
-            previous_count = 0
+            previous_artist_data = None
 
         else:
 
-            count, artist, songs = heapq.heappop(artist_queue)
+            count, random_value, artist, songs = heapq.heappop(artist_queue)
 
-        song = songs.pop(0)
+        song = songs.pop()
 
-        result.append((artist, song))
+        ordered_songs.append((artist, song))
 
-        if previous_songs:
+        if previous_artist_data:
 
             heapq.heappush(
-                artist_queue, (previous_count, previous_artist, previous_songs)
+                artist_queue,
+                previous_artist_data,
             )
 
         if songs:
 
-            previous_artist = artist
-            previous_songs = songs
-            previous_count = count + 1
+            previous_artist_data = (
+                count + 1,
+                random.random(),
+                artist,
+                songs,
+            )
 
         else:
 
-            previous_artist = None
-            previous_songs = None
-            previous_count = 0
+            previous_artist_data = None
 
-    return result
+    return ordered_songs
 
 
 def create_output_folder(source_folder):
+    """
+    Create a fresh output folder next to the source folder.
+    If the previous output folder exists, it is removed
+    before creating the new result.
+    """
 
     parent_folder = os.path.dirname(os.path.normpath(source_folder))
 
@@ -208,7 +240,11 @@ def create_output_folder(source_folder):
 
     output_folder = os.path.join(parent_folder, f"{folder_name}_Shuffled")
 
-    os.makedirs(output_folder, exist_ok=True)
+    if os.path.exists(output_folder):
+
+        shutil.rmtree(output_folder)
+
+    os.makedirs(output_folder)
 
     return output_folder
 
@@ -238,9 +274,13 @@ def get_unique_filename(file_path):
 
 def process_music_folder(source_folder, unknown_artist):
     """
-    Read music files, group them by artist,
-    create a balanced order, and copy them
-    into a new numbered folder.
+    On every run:
+    - All songs are scanned again
+    - Artists are read again
+    - Previous numbering is removed
+    - A new order is created for all songs
+    - A fresh output folder is created
+    - All songs receive new numbering
     """
 
     if not os.path.isdir(source_folder):
@@ -251,29 +291,41 @@ def process_music_folder(source_folder, unknown_artist):
     if not music_files:
         raise ValueError("no_music_files")
 
-    output_folder = create_output_folder(source_folder)
-
     files_by_artist = defaultdict(list)
 
+    # Read all songs again and group them by artist
     for file_path in music_files:
 
-        artist = get_artist(file_path, unknown_artist)
+        artist = get_artist(
+            file_path,
+            unknown_artist,
+        )
 
         files_by_artist[artist].append(file_path)
 
+    # Create a completely new order for all songs
     ordered_songs = create_shuffled_order(files_by_artist)
+
+    output_folder = create_output_folder(source_folder)
 
     total_songs = len(ordered_songs)
 
-    number_width = max(3, len(str(total_songs)))
+    number_width = max(
+        3,
+        len(str(total_songs)),
+    )
 
     copied_songs = []
 
-    for index, (artist, source_file) in enumerate(ordered_songs, start=1):
+    for index, (artist, source_file) in enumerate(
+        ordered_songs,
+        start=1,
+    ):
 
         original_filename = os.path.basename(source_file)
 
-        clean_filename = remove_existing_number(original_filename)
+        # Remove all previous numbering prefixes
+        clean_filename = remove_existing_numbers(original_filename)
 
         number = str(index).zfill(number_width)
 
@@ -283,7 +335,10 @@ def process_music_folder(source_folder, unknown_artist):
 
         destination_file = get_unique_filename(destination_file)
 
-        shutil.copy2(source_file, destination_file)
+        shutil.copy2(
+            source_file,
+            destination_file,
+        )
 
         copied_songs.append(
             {
