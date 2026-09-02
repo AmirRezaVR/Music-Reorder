@@ -4,6 +4,7 @@ import shutil
 import heapq
 import random
 
+
 from collections import defaultdict
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -26,58 +27,62 @@ MUSIC_EXTENSIONS = (
 # Application translations
 TEXT = {
     "English": {
-        "window_title": "Music Shuffler by Artist",
-        "title": "Music Shuffler",
+        "window_title": "Music Reorder",
+        "title": "Music Reorder",
         "language": "Language",
         "description": (
-            "Select or drag and drop your music folder.\n"
-            "Songs will be copied into a new folder and arranged "
-            "to avoid consecutive songs from the same artist."
+            "Select your music folder or drag and drop it here.\n"
+            "Your songs will be copied to a new folder and rearranged "
+            "to keep songs from the same artist apart whenever possible."
         ),
         "browse": "Browse...",
-        "start": "Shuffle and Copy Music",
+        "start": "Reorder and Copy Music",
         "ready": "Ready",
-        "processing": ("Reading music files and creating a new order..."),
-        "done": "Done! {count} songs were processed.",
-        "select_folder_title": "Select your music folder",
+        "processing": "Reading your music and creating a new order...",
+        "done": "Done! {count} songs have been processed.",
+        "select_folder_title": "Select Your Music Folder",
         "no_folder_title": "No Folder Selected",
-        "no_folder_message": ("Please select or drag a music folder first."),
-        "finished_title": "Finished",
-        "finished_message": (
-            "Successfully processed {count} songs.\n\n" "Output folder:\n{folder}"
+        "no_folder_message": (
+            "Please select your music folder or drag and drop it here."
         ),
-        "error_title": "Error",
-        "error_status": "An error occurred.",
-        "invalid_folder": ("The selected folder does not exist."),
+        "finished_title": "All Done",
+        "finished_message": (
+            "{count} songs have been successfully processed.\n\n"
+            "Output folder:\n{folder}"
+        ),
+        "error_title": "Something Went Wrong",
+        "error_status": "Something went wrong.",
+        "invalid_folder": ("The selected folder could not be found."),
         "no_music_files": ("No supported music files were found in this folder."),
         "unknown_artist": "Unknown Artist",
     },
     "فارسی": {
-        "window_title": "مرتب‌ساز موسیقی بر اساس خواننده",
-        "title": "مرتب‌ساز موسیقی",
+        "window_title": "تغییر ترتیب آهنگ‌ها",
+        "title": "تغییر ترتیب آهنگ‌ها",
         "language": "زبان",
         "description": (
-            "پوشه آهنگ‌ها را انتخاب کنید یا آن را "
-            "Drag & Drop کنید.\n"
-            "آهنگ‌ها در یک پوشه جدید کپی می‌شوند و تا حد امکان "
-            "دو آهنگ از یک خواننده پشت سر هم قرار نمی‌گیرند."
+            "کنید Drag & Drop پوشه آهنگ‌ها را انتخاب یا آن را "
+            "\n"
+            "آهنگ‌ها در پوشه‌ای جدید کپی شده و ترتیب آنها "
+            "تغییر می‌کند تا حد امکان دو آهنگ "
+            "از یک خواننده پشت هم نباشند"
         ),
-        "browse": "انتخاب پوشه...",
-        "start": "مرتب‌سازی و کپی آهنگ‌ها",
+        "browse": "...انتخاب پوشه",
+        "start": "تغییر ترتیب و کپی آهنگ‌ها",
         "ready": "آماده",
-        "processing": ("در حال خواندن اطلاعات آهنگ‌ها و ایجاد ترتیب جدید..."),
-        "done": ("انجام شد! تعداد {count} آهنگ پردازش شد."),
-        "select_folder_title": ("پوشه آهنگ‌ها را انتخاب کنید"),
-        "no_folder_title": ("پوشه‌ای انتخاب نشده است"),
-        "no_folder_message": ("ابتدا یک پوشه انتخاب کنید یا آن را Drag & Drop کنید."),
-        "finished_title": "عملیات تمام شد",
+        "processing": "...در حال خواندن اطلاعات آهنگ‌ها و ایجاد ترتیب جدید",
+        "done": "انجام شد! تعداد {count} آهنگ پردازش شد",
+        "select_folder_title": "پوشه آهنگ‌ها را انتخاب کنید",
+        "no_folder_title": "پوشه‌ای انتخاب نشده است",
+        "no_folder_message": "کنید Drag & Drop پوشه آهنگ‌ها را انتخاب یا آن را ",
+        "finished_title": "اتمام عملیات",
         "finished_message": (
-            "تعداد {count} آهنگ با موفقیت پردازش شد.\n\n" "پوشه خروجی:\n{folder}"
+            "تعداد {count} آهنگ با موفقیت پردازش شد\n\n" "پوشه خروجی:\n{folder}"
         ),
         "error_title": "خطا",
-        "error_status": "خطایی رخ داد.",
-        "invalid_folder": ("پوشه انتخاب‌شده وجود ندارد."),
-        "no_music_files": ("هیچ فایل موسیقی پشتیبانی‌شده‌ای در این پوشه پیدا نشد."),
+        "error_status": "خطایی رخ داد",
+        "invalid_folder": "پوشه انتخاب‌شده وجود ندارد",
+        "no_music_files": "هیچ فایل صوتی قابل پردازشی در این پوشه پیدا نشد",
         "unknown_artist": "خواننده نامشخص",
     },
 }
@@ -380,24 +385,18 @@ class MusicShufflerApp:
 
     def create_interface(self):
 
-        # Language selector
-        language_frame = tk.Frame(self.root)
-
-        language_frame.pack(pady=(15, 0))
-
-        self.language_label = tk.Label(language_frame)
-
-        self.language_label.pack(side="left", padx=(0, 8))
-
-        language_menu = tk.OptionMenu(
-            language_frame,
-            self.current_language,
-            "English",
-            "فارسی",
-            command=lambda event: self.update_language(),
+        # Language toggle
+        self.language_button = tk.Button(
+            self.root,
+            command=self.toggle_language,
+            width=10,
         )
 
-        language_menu.pack(side="left")
+        self.language_button.pack(
+            anchor="ne",
+            padx=20,
+            pady=(15, 0),
+        )
 
         # Main title
         self.title_label = tk.Label(self.root, font=("Arial", 16, "bold"))
@@ -445,11 +444,20 @@ class MusicShufflerApp:
 
         self.status_label.pack(pady=5)
 
+    def toggle_language(self):
+
+        if self.current_language.get() == "English":
+            self.current_language.set("فارسی")
+        else:
+            self.current_language.set("English")
+
+        self.update_language()
+
     def update_language(self):
 
-        self.root.title(self.get_text("window_title"))
+        current_language = self.current_language.get()
 
-        self.language_label.config(text=self.get_text("language"))
+        self.root.title(self.get_text("window_title"))
 
         self.title_label.config(text=self.get_text("title"))
 
@@ -460,6 +468,12 @@ class MusicShufflerApp:
         self.start_button.config(text=self.get_text("start"))
 
         self.status_label.config(text=self.get_text("ready"))
+
+        # Show the language that the user can switch to
+        if current_language == "English":
+            self.language_button.config(text="فارسی")
+        else:
+            self.language_button.config(text="English")
 
     def browse_folder(self):
 
