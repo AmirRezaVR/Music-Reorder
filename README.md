@@ -201,8 +201,3 @@ Music Reorder does not move, delete, or modify your original music files.
 It only copies them to the output folder and adds the new numbering to the copied files.
 
 Numbering starts at `001` and automatically uses more digits when needed for larger collections.
-
-
-## License
-
-This project is licensed under the MIT License.
